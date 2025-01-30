@@ -1,0 +1,10 @@
+---
+title: "2025-01-28"
+format: html
+editor: visual
+---
+
+\##"5-humber summary" (John Tukey, 1977) #- the sample minimum #- the lower or first quartile #- the median #- the upper quartile or third quartile #- the sample maximum #- AND (as a summary stat) the mean or arithmetic average
+
+```{r}
+getwd()
