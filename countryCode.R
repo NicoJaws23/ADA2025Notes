@@ -14,5 +14,7 @@ median(df$population, na.rm = TRUE)
 df$popDensity <- df$population / df$area #by having the df$ before the name of the variable
 #it adds it into the data frame
 #ranking in order of density
-sort()
-
+sort(df$popDensity, decreasing  = TRUE)
+df <- arrange(df, desc(popDensity)) #this is a better way to rearrange the data 
+#because it actually changes it in the table
+head(df, 10)
