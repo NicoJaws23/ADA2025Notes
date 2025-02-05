@@ -87,8 +87,7 @@ library(skimr) #holds skim() function
 skim(d) #also creates a summary of the data
 ```
 
-##Visualizations
-Boxplots are one way to do this. boxplot() is how we do this, it can be adjuted to have wiskers of different lengths. For below, need to run it all together, the strip chart plots the values on top of the box plot which already exists
+##Visualizations Boxplots are one way to do this. boxplot() is how we do this, it can be adjuted to have wiskers of different lengths. For below, need to run it all together, the strip chart plots the values on top of the box plot which already exists
 
 We can also use ggplot in {ggplot2} to plot data. ggplot is more generic than boxplot() and you can tell it what kind of geometry you want to plot. Need to give it (1) the data, (2) the mapping of data aesthetics, (3) a geometry or the kind of plot, and optionally (4) a theme. 1-3 are required to produce a plot. Other things can be added too, see below, need to use "+" to do so
 
@@ -104,5 +103,3 @@ ggplot(data = d, mapping = aes( x = Family, y = log(Body_mass_female_mean))) +
   theme(axis.text.x = element_text(angle = 90)) +
   ylab("log(Female Body Mass)")
 ```
-
-
