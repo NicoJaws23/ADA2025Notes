@@ -1,0 +1,129 @@
+---
+title: "Notes"
+format: html
+editor: visual
+---
+
+## Notes 2/6/2025 Flow Control and Looping
+
+The following code uses the if_else statement and different functions, grepl() and str_detect() to create a new variable using mutate(). We then summarize the total number of movies and the total number of comedy movies
+
+```{r}
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/IMDB-movies.csv"
+d <- read_csv(f, col_names = TRUE)
+head(d)
+library(tidyverse)
+library(dplyr)
+library(stringr)
+#add comedy variable based on if genre column has comedy. COlumn says TRUE if one of the
+
+d <- d |>
+  mutate(Comedy = if_else(grepl("CoMeDy", genres, ignore.case = TRUE), TRUE, FALSE))
+#looking at genres column, need to look at each cell in column and see if comedy appears,
+#have new 'Comedy" variable be true or false depending on presence of 'Comedy"
+#grepl() has 2 arguments, what its looking for and where to look for it, looks for that value
+#anywhere in the field, as long as its these it'll take it, Having ignore.case set to true
+#will remove the case sensitivity
+
+d <- d |>
+  mutate(Comedy = if_else(str_detect(genres, "Comedy"), TRUE, FALSE))
+#str_detect does the same as grepl() but the arguemtns are reversed
+
+#here we summarize (1) the total number of movies using n() which gives the total number of
+#rows and (2) the total number of comedy movies with sum() which totals the number of cells
+#which = TRUE
+s <- d |>
+  summarise(count = n(), comedyCount = sum(Comedy))
+
+#part 3 of challenge, add new variable for ranking using case_when()
+#this code takes the ratings of the movies and then assigns a rating
+#based on the averageRating. It then groups the movies by genre
+#and counts the total number of movies and then gets the mean runtimeMin
+d <- d |>
+  mutate(ranking = case_when(
+    averageRating > 0 & averageRating < 3.3 ~ "low",
+    averageRating >= 3.3 & averageRating < 6.7 ~ "med",
+    averageRating >= 6.7 & averageRating < 10 ~ "high"
+  ))
+r <- d |>
+  group_by(genres) |>
+  summarise(cound = n(), meanRT = mean(runtimeMinutes, na.rm = TRUE))
+
+```
+
+## Loops
+
+for (i in 1:....) {do this}
+
+The loop takes the argument and does it iteratively for the specified argument in the loop
+
+```{r}
+#for loop example, prints 1 to 10 for i. also, at j prints out the square root
+#of each number 1-10
+for (i in 1:10){
+  print(i)
+  j <- sqrt(i)
+  print(j)
+}
+#prints each of the leters in the vector for i
+for (i in c("a", "e", "i", "o", "u")){
+  print(i)
+}
+#can also have nested for loops
+for (i in 1:10){
+  for(j in c('a', 'b', 'c')){
+    print(i)
+    print(j)
+  }
+}
+
+```
+
+Now we will do a loop of the movies data set to print out the cumulative run time through. By trying to find something in a loop need to define it outside of the loop first. The below code first sets cumRT to 0, and then loops through the runtimeMinutes column for values which are not NA and add the value of each row to cumRT, giving the cumulative value. The code below it does the same thing but it takes longer
+
+```{r}
+cumRT <- 0
+for (i in d$runtimeMinutes){
+  if (!is.na(i)){
+   cumRT <- cumRT + i 
+  }
+}
+cumRT
+
+cumRT <- 0
+for (i in 1:nrow(d)){
+  if (!is.na(d[i,]$runtimeMinutes)){
+    cumRT <- cumRT + d[i,]$runtimeMinutes
+  }
+}
+cumRT
+```
+
+# Joins
+
+There are inner joins and outer joins
+
+Inner Joins: If we have two tables with 3 rows and matching columns, we can merge the two tables together based on shared indicies/values in those tables. Looking for common index of a specified value in 2 different tables. Using merge() and. Called inner join because makes table smaller because it is taking the intersection of the values. Think like GIS joins![](images/clipboard-2059141050.png)
+
+Outer Joins: Left joing, right join, full join. Called outer join becuase you are potentially making the tables longer. Taking various kinds of unions. Works for when tables have same field but may not have same values in the fields. Left and right give direction, is A going to B or is B going to A. Full join have all rows and adds rows for NA rows which dont match up. ![](images/clipboard-3654234852.png)
+
+Now we will code some joins. First gotta do some data wrangling
+
+```{r}
+f1 <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/papers.csv"
+f2 <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/creators.csv"
+p <- read_csv(f1, col_names = TRUE)
+c <- read_csv(f2, col_names = TRUE)
+head(p)
+head(c)
+
+#but first, data wrangle
+p <- p |>
+  separate_wider_delim(cols = Author, delim = ";", names = c("First Author", "A2", "A3", "A4"), too_few = "align_start", too_many = "drop") |> #this function here creates new columns based on the data in the original authors column in the OG file split based on ;
+  mutate(A2 = str_trim(`A2`, "both"), A3 = str_trim(`A3`, "both"), A4 = str_trim(`A4`, "both")) #this mutate section here trims down the white space
+
+c <- c |>
+  distinct() #this function looks in data for identical rows and just keeps 1 of them, throws out redundant rowss
+
+head(c)
+```
