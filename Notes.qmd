@@ -224,7 +224,7 @@ Here is another function. This is a filter function which filters a dataframe an
 ```{r}
 my_filter <- function(x, condition, variable){
   library(tidyverse)
-  x <- x |> filter(value %in% condition)
+  x <- x |> filter(!!sym(variable) %in% condition)
   return(x)
 }
 df <- data.frame(rowid = c(1:5), value = c("a", "b", "c", "d", "e"))
@@ -261,4 +261,69 @@ Check if puzzle was solved, if not prompt another guess until they get the answe
 
 #Getting user to enter string of variables
 guess <- readline("make a guess:" )
+```
+
+# 2/13/2025 Notes
+
+## Class 8: Starting into Stats and Inference
+
+Need {mosaic} and {radiant} packages
+
+```{r}
+library(mosaic)
+library(radiant)
+```
+
+Stats: Big Ideas
+
+-   Population vs sample
+
+-   Parameter vs stat
+
+-   Measure of location, spread and shape
+
+We have a population out there which we may know little and we want to know more
+
+We collect observations about individuals or processes in that population as a sample
+
+We use stats to summarize, reduce, or describe data that has some empirical distribution
+
+We expect (hope?) that stats based on a sample give good estimates of pop-level parameters that are likewise descriptors of the distribution of the variable of interest in the larger population
+
+A stat is some function of the data alone, a combination based on a finite amount of data. An approximation of the population that we can use to make inferences. Need to think about if the sample is unbiased, random, and representative of the population of the whole
+
+Summarizing aspects of stats: A measure of location (central tendency; mean, median, mode, harmonic mean) for a distribution, a measure of spread (mean deviation, mean squared deviation/variance, standard deviation) or scatter around that location, and a measure of the shape (skewness, kutrosis) of the distribution.
+
+[SPREAD]{.underline}
+
+population variance = a parameter = SS/N aka sum((x-mean(x)\^2)/(length(x))
+
+Sample variance = a stat = SS/n-1 = s\^2 aka var()
+
+pop standard deviation = a parameter = sigma, radiant::sdpop()
+
+sample standard deviation = a stat, sd()
+
+```{r}
+#function for measuring population variance
+
+pop <- c(10, 100, 1000, 2000)
+#function for population variance
+popVar <- function(x){
+  v <- sum((x-mean(x))^2)/(length(x))
+  return(v)
+}
+popVar(pop)
+
+#function for sample variance
+sampVar <- function(x){
+  v <- sum((x-mean(x))^2)/(length(x)-1)
+  return(v)
+}
+meanFunc <- function(x){
+  v <- (sum(x)/length(x))
+  return(x)
+}
+meanFunc(pop)
+sampVar(pop)
 ```
