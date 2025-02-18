@@ -327,3 +327,123 @@ meanFunc <- function(x){
 meanFunc(pop)
 sampVar(pop)
 ```
+
+# 2/18/2025 Notes
+
+For thursday: look through modules 13, 14, and 15
+
+### Stats, Big Ideas
+
+Some stats are associated with well-defined mathematical distributions (gaussian and normal dist)
+
+Stats are estimates of the parameters of distributions
+
+Presumption that stats we use are good estimates of population level parameters, basis of classical stats inferences (F ration; chi squared; T tests)
+
+Lets draw a sample from some standard distribution to see how stats compare to parameters of dist
+
+```{r}
+#Fist, plot a NORMAL distribution
+library(mosaic)
+mu <- 10 #for the "mean" parameter
+sigma <- 2 # for the "sd" parameters
+plotDist("norm", mean=mu, sd=sigma, xlab="x", ylab="Frequency") #plot the distribution
+
+s1 <- rnorm(n = 100, mean = 10, sd = 2) #rnorm pulls a random normal value, drawing a set of 10 random numbers. This is a normal distribution pull
+mean(s1)
+
+s2 <- rpois(n = 10, lambda = 10) #this does a poissan distribution
+```
+
+### Sampling Distribution
+
+Each time we select a sample and calc summary stats, we get slightly different results. If we repeat this sampling process multiple times, we can use the results to generate a new distribution for those particular summary stats of interest
+
+Sample Dist is the set of possivle stats that could have been generated if the data collection process were repeated many times, along with the probabilities of these possible values.
+
+Lets create a sample dist for the mean of samples drawn from normal dist with mean of 10 and sd of 2
+
+```{r}
+reps <- 500
+
+samp_dist_mean <- do(reps) * mean(rnorm(n = 10, mean = 10, sd = 2)) #increasing sample size (n) makes the spread on the x-axis much more narrower
+str(samp_dist_mean) #generates a sampling dist for the mean of our sample
+histogram(samp_dist_mean$mean)
+
+samp_dist_median <- do(reps) * median(rnorm(n = 10, mean = 10, sd = 2))
+str(samp_dist_median)
+histogram(samp_dist_median$median)
+```
+
+The mean of a sampling distribution for a particular stat should be a really good point estimate of the population value for that statistic.
+
+How reliable or unreliable are these estimates of a population parameter based on the mean of the sampling distribution for a stat of interest? How far off is a stat that we calculate based on a sampling dist likely to be from the true population value of the parameter of interest
+
+A stat called the standard error is one way to check this
+
+standard error (SE) = square root of the variance of the sampling distribution = standard deviation of a sampling dist
+
+```{r}
+#this is how we can calculate the standard error, using the standard dev of a sampling distribution
+sd_mean <- sd(samp_dist_mean$mean)
+sd_median <- sd(samp_dist_median$median)
+#again, increasing the sample size being taken out will decrease/narrow down the standard deviation
+#standard error is a standard deviation of a sample dist but standard deviation is not necessarily the standard error
+```
+
+Estimate SE from a single sample: We can estimate the se associated with samples of size n from a single sample of a size n as the standard deviation of a sample divided by the square root of the sample size
+
+```{r}
+x <- rnorm(n = 10, mean = 10, sd = 2)
+se <- sd(x)/sqrt(length(x))
+```
+
+These are different ways of getting at a measure of uncertainty to see how out stat reflects the population/reality of the dataset. Want to have as big a sample size as you can to reduce uncertainty.
+
+This is an example of programming a simulation. Seeing what the effects of altering something (sample size/replicates) do
+
+### Confidence Intervals
+
+The se can be used to derive another measure of uncertainty in a stats values: the confidence interval, or CI
+
+The CI is thus another way of describing a stat's sampling distribution, and it plays a central role in basic inferential stats
+
+The CI is an interval around our estimate of mean of the sampling dist for a particular stat (usually mean) and it gives us a range of values into which subsequent estimates of a stat would be expected to fall some critical proportion of the time, if the sampling exercise were to be repeated
+
+Intuitively, higher confidence is associated with a wider interval. The 95% CI around a stat described the range of values into which a new estimate of the stat derived from a subsequent sample would be expected to fall 95% of the time. Next exercise will be generating CI calculated from repeated draws from a data set.
+
+3rd SE method (almost never) if pop variance/standard dev is known
+
+EXERCISE:
+
+```{r}
+
+x <- rnorm(n = 100, mean  = 2, sd = 4)
+mean <- mean(x)
+sd <- sd(x)
+se <- sd/sqrt(length(x))
+rep <- 1000
+xRep <- do(rep) * mean(rnorm(n = 100, mean = 2, sd = 4))
+seMean <- sd(xRep$mean)
+
+```
+
+EXERCISE: t distribution, has shape really similar to normal dist based on degrees of freedom, fat tails, short peak when below 30 degrees of freedom which is considered "low" degrees of freedom
+
+```{r}
+plotDist("t", df=99, xlab="x", ylab="Frequency", col="red") #df is degrees of freedom
+plotDist("t", df = 50, add = TRUE)
+plotDist("t", df = 25, add = TRUE)
+plotDist("norm", mu=0, sd=1, add = TRUE)
+```
+
+Do do t distribution, do rt instead of rnorm
+
+EXERCISE: Beta dist
+
+```{r}
+plotDist("beta", shape1 = 0.3, shape2 = 4) #shape parameters define how curve looks
+reps <- 1000
+s <- do(reps) * mean(rbeta(n=100, shape1 = .3, shape2 = 4)) #drawing 1000 samples of size 100 with these shape parameters
+histogram(s$mean)
+```
