@@ -414,7 +414,7 @@ Intuitively, higher confidence is associated with a wider interval. The 95% CI a
 
 3rd SE method (almost never) if pop variance/standard dev is known
 
-EXERCISE:
+EXERCISE: Draw 100 random numbers from a normal dist with mean = 2 and sd = 4
 
 ```{r}
 
@@ -439,11 +439,113 @@ plotDist("norm", mu=0, sd=1, add = TRUE)
 
 Do do t distribution, do rt instead of rnorm
 
-EXERCISE: Beta dist
+EXERCISE: Beta dist,
 
 ```{r}
 plotDist("beta", shape1 = 0.3, shape2 = 4) #shape parameters define how curve looks
 reps <- 1000
 s <- do(reps) * mean(rbeta(n=100, shape1 = .3, shape2 = 4)) #drawing 1000 samples of size 100 with these shape parameters
 histogram(s$mean)
+```
+
+# 2/20/2025 Notes, Playing with Distributions
+
+Ex5 will be due next thursday (says tuesday rn)
+
+Sampling Dist: Set of sample/possible stats, generate sum stat of some kind
+
+Beta Distribution, shape1 and shape2 are the exponents/values that are in the beta distribution function
+
+```{r}
+plotDist("beta", shape1 = 0.3, shape2 = 4)
+x <- rbeta(100, .3, 4)
+se <- sd(x)/sqrt(length(x)) #checking standard error when not doingthe reps, i.e. you have a single sample
+
+reps <- 500
+s <- do(reps)*mean(rbeta(n=100, .3, 4))
+histogram(s$mean)
+
+sd(s$mean) #this is the standard error of s which we can caluculate using the standard deviation, gives estimate of uncertainty of the sample size (n=). Can do this method when having multiple sample stats, the reps
+```
+
+Standard error defined as standard distribution of sampling distribution, but there are diff ways to calculate it
+
+## Distribution Functions
+
+r\_(n = ), draws random samples of a particular size n from a given dist
+
+p\_(q =), returns the quantile associated with a given value X
+
+q\_(p =), returns the value of X at a given quantile through the distribution, value of the inverse cumulative density functions (cdf)
+
+d\_(x=), returns the value of the probability density function (pdf) at the values of x
+
+Total probability density of any function has to be 1 or 100%
+
+We use q\_() function often to get the value of X associated with particular quantiles of a distribution, whether the dist is theoretical or empirical
+
+```{r}
+#What value of X is associated with the 0.025 and 0.975 quantiles of a standard normal dist (which would be the central 95% of a given dist)
+qnorm(p = c(0.025, 0.975), mean = 0, sd = 1) #gives you upper and lower 95% confidence intervals
+
+#What value of X is associated with the 0.025 and 0.975 quantiles of a beta distribution with a shape1=2 and shape2=4
+qbeta(p = c(0.025, 0.975), shape1 = 2, shape2 =4)
+
+#for p, can pass it however many values you want, does not just have to be 2, for example could add in 0.50 to get the midpoint of the data
+```
+
+## Confidence Intervals
+
+The SE can be used to derive the confidence interval, CI
+
+The CI is another way of describing a stat's sampling dist, and it play a central role in basic inferential stats
+
+CI: Interval around our estimate of mean of the sampling distribution for a particular stat (typically a mean) and it gives us a range of values into which subsequent estimates of a stat would be expected to fall
+
+CI is calculated as: the value of the stat +/- some critical value \* the standard error of the stat
+
+```{r}
+#What is the theoretical 95% CI around the estimate of the mean of the following vector?
+x <- c(2.9, 4.8, 8.9, -3.2, 9.1, -2.5, -0.9, -0.1, 2.8, -1.7)
+m <- mean(x)
+se <- sd(x)/sqrt(length(x))
+ci <- m + qnorm(c(0.025, 0.975)) * se #calculating confidence interval, this gives 95% CI, but can adjust to give different % CIs
+#or
+ci <- m + c(qnorm(0.025), qnorm(0.975)) * se
+percent_ci <- 0.95
+alpha <- 1 - percent_ci/100
+ci <- m + qnorm(c(alpha/2, (1 - (alpha/2)))) * se
+```
+
+## Central Limit Theorem (CLT)
+
+The sampling dist of averages of "independently and identically distributed" (iid) random variables approaches a normal dist as sample size increases
+
+Overarching theme of all this work. Gives us good sense of mean and dist of average events in a population even though we only observe one or a small number of samples of those events and even though we do not know what the actual population dist is
+
+CLT states that regardless of underlying probability dist of a pop of IID continuous random variables the dist of a stat will be approximately normal, centered at the pop mean for a stat...
+
+Variables are expected to be the sum of multiple independent processes will also have distributions that are nearly normal
+
+As sample size increases, CI should shrink, reducing uncertainty.
+
+For small sample sizes, we change how we calculate the critical value, we use the t distribution. DF is below 30, CI is gonna get a lil more negative and positive to capture all the values. Degrees of freedom (df) is sample size minus 1, so with 30 samples, you have 29 degrees of freedom
+
+SO instead of quantiles from a normal dist, we use the quantiles from a t dist
+
+## Calc CIs by Boostrapping
+
+Alternative way to calc a CI for a given stat from the data ina single sample using a Monte Carlo sim process (Boostrapping)
+
+Lets us approximate a sampling dist even without access to pop from which samples are drawn.
+
+```{r}
+n_boot <- 10000
+boot <- vector(length=n_boot) #set up dummy variable to hold our sims
+n <- length(x) #boostrap sample size will be same length of data
+for (i in 1:n_boot){
+  boot[[i]] <- mean(sample(x, n, replace = TRUE))
+}
+ci <- quantile(boot, probs = c(0.025, 0.975))
+
 ```
