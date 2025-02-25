@@ -549,3 +549,120 @@ for (i in 1:n_boot){
 ci <- quantile(boot, probs = c(0.025, 0.975))
 
 ```
+
+# 2/25/2025 Hypothesis Testing
+
+SE: sd of sampling distribution
+
+Confidence Intervals: How much of sampling distribution falls around an estimator/stat
+
+## Null hypothesis significance testing
+
+Null hypoth is interpreted as a baseline hypothesis and is the claim that is presumed to be true. Claim is typically that a particular value of a population parameter estimated by a sample stat we have calculated is consistent with a particular null expectation. Alternative hypoth is the conjecture that we are testing usuaully that the sample stat is inconsistent with a null expectation
+
+Null hypothesis, H0, is a sample stat that shows no deviation from what is expected or neutral based on the parameter space of possible outcomes under the presumed random sampling process.
+
+Ha, alternative hypothesis, a sample stat deviates more than expected by chance from what is expected or neutral
+
+To do hypothesis test we need to...
+
+-   calc a test stat based on data
+
+-   calculate the p value associated with that test stat which is the probability of obtaining, by chance, a test stat that is as high or higher than our calculated one
+
+-   Compare test stat to some appropriate standardized sample dist with well-known mathematical properties to yield a p value
+
+-   Evaluate whether the p value is less than or greater than the significance level
+
+Traditional parametric stats, we make the assumption that the sampling dist of out stat takes a well understood mathematical dist (normal dist, t dist, beta dist, etc) and we calc the test stat the summarized the location of a summary stat about our data relative to that implied theoretical sampling dist
+
+Test stat is some summary stat divided by its standard error and measures how far away from zero a summary stat is in terms of a number of standard errors
+
+Value of our test stat is determined by both the differnece between the original sample stat and the expected null value (Difference between the mean of our sample and the expected population mean or the difference between the mean and 0) and the standard error of the sample stat
+
+Process:
+
+Specify the sample stat to evaluate
+
+Specify the test stat of interest and the form of the sampling dist for that stat
+
+Calc the tail probability, i.e. the probability of obtaining a stat (ex mean) as or more extreme than was observed assuming that null distribution. Can be one or 2 tailed
+
+**Look at module 15 on 1 and 2 sample tests**
+
+### One Sample T Test Example from Mod 15
+
+```{r}
+library(tidyverse)
+library(mosaic)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/woolly-weights.csv"
+d <- read_csv(f, col_names = TRUE)
+head(d)
+
+#get mean, sd, and se
+m <- mean(d$weight)
+s <- sd(d$weight)
+se <- s/sqrt(length(d$weight))
+
+#set up 2-tailed hypothesis, the hypothesis test stat is as follows: t = (m - 7.2)/se. 7.2 is assumed value based on null hypothesis
+mu <- 7.2 #null value/expected value based on prior information
+t_stat <- (m - mu)/se
+t_stat #so we are not 3.3 standard errors away from the expected value
+
+#now we need to figure out the p-value associated with the test stat
+#calc 95% confidence interval
+ci <- m + qnorm(c(0.025, 0.975)) * se
+ci2 <- m + qt(p = c(0.025, 0.975), df = 14) * se #df = 14 because degrees of freedom = length - 1 (15 - 1 in this case)
+
+#doing a bootstrap to resample the obs and calc the mean and CIs
+n_boot <- 10000
+boot <- vector()
+n <- length(d$weight)
+for (i in 1:n_boot){
+  boot[[i]] <- mean(sample(d$weight, n, replace = TRUE))
+}
+hist(boot)
+CI <- quantile(probs = c(0.025, 0.975), boot)
+
+#Do these CIs include the expected mean (7.2)? NO! CI ranges from 5.99 - 6.87
+#Now need to calculate proability of being in lower or upper end of distriution
+#Summing the probabilities assuming test stat is drawn from t distribution
+p_lower <- pt(-1 * abs(t_stat), df = length(d$weight) - 1) #chance of something as low as 3.3 standard errors from the center given t distribution
+p_upper <- 1 - pt(1 * abs(t_stat), df = length(d$weight) - 1) #chance of something as high as 3.3 standard errors from the center give t distribution
+p <- p_lower + p_upper #sum of the proabilities, gives significance value
+
+#Can do all of this with t.test() function
+t.test(x = d$weight, mu = mu, alternative = "two.sided") #we did all the calculations this function does just as separate units
+#CI from this is just ONE estimate of confidence, versus us doing 10000 interations
+
+
+```
+
+### Coding EX: A 2-sample t test
+
+Home range data for spider monkeys
+
+load in as d
+
+```{r}
+library(tidyverse)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/tbs-2006-2008-ranges.csv"
+d <- read.csv(f)
+head(d)
+stats <- d |>
+  group_by(sex) |>
+  summarise(mK95 = mean(kernel95), sdK95 = sd(kernel95), seK95 = sd(kernel95)/sqrt(length(kernel95))) #NOTE MAKE SURE EX5 has length specified to the column, or use n() function instead of length(kernel95)
+
+ggplot(data = d, mapping = aes(x = sex, y = kernel95)) +
+  geom_boxplot() +
+  geom_point()
+
+n_boot <- 10000
+boot <- vector()
+n <- length(d$kernel95)
+for (i in 1:n_boot){
+  boot[[i]] <- mean(sample(d$kernel95, n, replace = TRUE))
+}
+hist(boot)
+CI <- quantile(probs = c(0.025, 0.975), boot)
+```
