@@ -646,6 +646,7 @@ load in as d
 
 ```{r}
 library(tidyverse)
+library(mosaic)
 f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/tbs-2006-2008-ranges.csv"
 d <- read.csv(f)
 head(d)
@@ -657,12 +658,137 @@ ggplot(data = d, mapping = aes(x = sex, y = kernel95)) +
   geom_boxplot() +
   geom_point()
 
+
 n_boot <- 10000
-boot <- vector()
-n <- length(d$kernel95)
+
+#Male boot
+dM <- filter(d, sex == "M")
+Mboot <- vector()
+n <- length(dM$kernel95)
 for (i in 1:n_boot){
-  boot[[i]] <- mean(sample(d$kernel95, n, replace = TRUE))
+  Mboot[[i]] <- mean(sample(dM$kernel95, n, replace = TRUE))
 }
-hist(boot)
-CI <- quantile(probs = c(0.025, 0.975), boot)
+hist(Mboot)
+dM_CI <- quantile(Mboot, probs = c(0.025, 0.975))
+
+#Female boot
+dF <- filter(d, sex == "F")
+Fboot <- vector()
+nf <- length(dF$kernel95)
+for (i in 1:n_boot){
+  Fboot[[i]] <- mean(sample(dF$kernel95, nf, replace = TRUE))
+}
+hist(Fboot)
+dF_CI <- quantile(Fboot, probs = c(0.025, 0.975)) #CI for boot
+fMean <- mean(Fboot)
+fSE <- sd(dF$kernel95)/sqrt(length(dF$kernel95))
+CI_F <- fMean + qnorm(c(0.025, 0.975)) * fSE
+
+#Programming t-test
+#Null hyppth: No difference in Male and Female home range
+#Alt: Male and female homerange are difference
+#Paired 
+```
+
+# 2/27/2025
+
+## T tests
+
+Paired t-test looks for difference in the means: Paired observations of the same individual
+
+Welchs t stat is default for R
+
+Inputs can change the P value depending on the degrees of freedom
+
+Difference of mean from an expectation divided by a standard error
+
+df in this case is minus 2 because we have 2 groups
+
+We have the means for each group, the sd for each group and the number of cases
+
+```{r}
+#Programming t-test
+#Null hyppth: No difference in Male and Female home range
+#Alt: Male and female homerange are difference
+#Paired 
+
+MaleMean <- mean(dM$kernel95)
+FemaleMean <- mean(dF$kernel95)
+mu <- 0
+sp2 <- (((Male-1)*(sd(dM$kernel95)^2))+((Female - 1)*(sd(dF$kernel95)^2)))/df
+Male <- 9
+Female <- 11
+df <- Male + Female - 2
+
+t <- (MaleMean - FemaleMean - mu)/(sqrt(sp2*((1/Male)+(1/Female))))
+
+#OR do the t.test() function
+ttest <- t.test(x = dM$kernel95, y = dF$kernel95, alternative = "two.sided", var.equal = TRUE)
+```
+
+## Two Sample Permutation Test
+
+How do we get the p value (module 15 for parametric p value)
+
+We have a t dist where we know its 0 centered and has certain number of degrees of freedom, are under the curve associated being to the left or right of standard errors of the distribution
+
+### 2 sample t.test using permutation
+
+How????
+
+Need a test stat, null hypothesis, generate a permutation dist (similar to bootstrap dist, but break association we want to test, shuffles up our data where we break any possible association, and then calculate difference with actual data), and determine p value
+
+We are looking at sex and homerange size, so we are going to randomize one or both of these variables and then recalculate the averages for each sex. Doing this a whole bunch of times and then recalculating
+
+Here we are generating a null distribution from our own data
+
+```{r}
+#Permutation tet
+d <- d |>
+  select(id, sex, kernel95)
+
+summary <- d |>
+  group_by(sex) |>
+  summarise(mean = mean(kernel95))
+
+#This is the true difference in data between male and female hr size
+obs <- filter(summary, sex == "F") |> pull(mean) - filter(summary, sex == "M") |> pull(mean)
+
+#Permute
+reps <- 10000
+perm <- vector()
+
+for(i in 1:reps){
+  temp <- d #temporary dataframe to hold while we permute, maintain data integrity
+  temp$sex <- sample(temp$sex) #shuffle stuff
+  summary <- temp |>
+    group_by(sex) |> #get means after shuffling
+    summarise(mean = mean(kernel95))
+  perm[[i]] <- filter(summary, sex == "F") |> pull(mean) - filter(summary, sex == "M") |> pull(mean) #pull means for each sex and check difference again
+} #Perm vector is dist in differnces in homerange size after each reshuffling
+
+#Perm dist should be centerd on 0
+#now we can calculate the p value
+
+hist(perm)
+
+#Now we estimate the p value
+p <- sum(perm < -1 * abs(obs) | perm > abs(obs))/reps
+```
+
+Here is how to do a permutation test with a function instead
+
+```{r}
+library(infer)
+
+d <- d |> specify(formula = kernel95 ~ sex)
+d <- d |> hypothesize(null = "independence")
+perm <- d |> generate(reps = 10000, type = "permute")
+perm <- perm |> calculate(stat = "diff in means", order = c("M", "F"))
+perm
+visualize(perm, bins = 20)
+obs <- d |>
+  specify(kernel95 ~ sex) |>
+  calculate(stat = "diff in means", order = c("F", "M"))
+  
 ```
