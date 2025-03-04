@@ -792,3 +792,147 @@ obs <- d |>
   calculate(stat = "diff in means", order = c("F", "M"))
   
 ```
+
+# 3/4/2025 Permutations Cont
+
+{infer} offers functions and standard workflow for using permutation methods for hypothesis testing, where we are dealing with means, differences between means, proportions, or differences in proportions
+
+P-values: We got out data, have a test-stat for it, simulate data based on our real data which breaks associations to create null model, then look for whether or not observed value is within rght/left tail of test stat (specify, hypothesize, generate, calculate, visualize, Module 16!!!
+
+```{r}
+library(infer) #analogs for two-sample t-tests
+library(tidyverse)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/tbs-2006-2008-ranges.csv"
+d <- read_csv(f, col_names = TRUE)
+
+#infer permutation pipeline
+d <- d |>
+  specify(formula = kernel95 ~ sex) #articulate relationship between 2 variables we are interested in
+d <- d |>
+  hypothesize(null = "independence") #declare null hypothesis we want to test, we are using independence since we are interested just in these 2 variables
+perm <- d |>
+  generate(reps = 10000, type = "permute") #number and type of shuffling we want to do to generate replicates, this is like when we used the sample function 
+perm <- perm |>
+  calculate(stat = "diff in means", order = c("M", "F")) #calc summary stat, males come first because they have the larger home range size so we have a positive value here
+mean(perm$stat) #should be close to 0
+visualize(perm, bins = 20) #sampling distribution for test stat
+
+#Can also use visuzalize() and shade_p_value() to plot our observed test stat value
+obs <- d |> #calcuate observed test stat
+  specify(kernel95 ~ sex) |>
+  calculate(stat = "diff in means", order = c("M", "F"))
+visualize(perm, bins = 20) + #visualize where on plot obs falls
+  shade_p_value(obs_stat = obs, direction = "both")
+p <- get_p_value(perm, obs, direction = "both") #gives us 2-tailed p-value, Module 16 goes over this workflow
+```
+
+{modelr} package is another method for doing permutation based hypothesis testing
+
+## Intro to Regression
+
+Need {lmodel2}, {sjPlot}, {broom}, {tidyverse}, {manipulate}, {patchwork}, {infer}
+
+```{r}
+library(tidyverse)
+library(broom)
+library(manipulate)
+library(patchwork)
+library(infer)
+library(lmodel2)
+library(sjPlot)
+library(skimr)
+```
+
+Regression is a common form of data modeling
+
+Exploring relationship between an outcome variable (dependent/response variable) and one or more explanatory/predictor variables
+
+Modeling response as outcome of a number of predictors
+
+**Simple (general) linear regression**: Resp variable is cont. numberical variable (HR size), single predictor tat is either numerical or categorical (Sex)
+
+**Multiple (general) linear regression**: Outcome is a cont. numerical variable, multiple predictors that are either numberical or categorical
+
+**ANOVA/ANCOVA**: Focuses on categorical predictors
+
+**Generalized Linear Regression**: Allows for binary, categorical, count variables as outcomes (ex: Poussin regression)
+
+**Before Modeling!!**
+
+Start with exploratory data analysis (Univaritate summary stats skim() from {skimr})
+
+Bivariate summary stats: Covariance expresses how much 2 number variables "change together" and whether that change is + or - (measures on a sample is the product of the deviations of each of 2 variables from their respective means divided by (sample size - 1), how much 2 variable vary together; Correlation coefficient is a standardized form of the covariance, divide by the product of the SDs of the 2 variables (a scaled covariance)
+
+Fundamental to understand covariance and correlation
+
+```{r}
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+head(d)
+
+#Weght by height relationship
+plot(d$weight, d$height)
+
+#Calculate the covariance by hand and with cov()
+x <- d$weight - mean(d$weight)
+y <- d$height - mean(d$height)
+cov <- sum(x*y)/999 
+cov(d$weight, d$height)
+#calculate the correlation by hand and wth cor()
+cor <- cov/(sd(d$height)*sd(d$weight))
+cor(d$weight, d$height)
+```
+
+Why regression? Use 1 or more variables to predict the value of an outcome vairable y based on the information contained in a set of predicator variables x
+
+Describe and quantify the relationship, develop and choose among different models of the relationship between the variables of interest (importants!!!), to do analyses of covariation among sets of variables to ID/explore their relative explanatory power
+
+### Notation for Regression
+
+Model outcome variable y as a linear function of the explanatory/predictor variables
+
+Use of beta values which are referred to as "regression coefficients", our analysis is trying to estimate those coefficients, while minimizing according to some criterion the error term
+
+Y as a function of some coefficient x + another constant + vector of errors/deviation
+
+Interested in beta values as set of coefficients we are trying to estimate using regression
+
+**Ordindary Least Squares:** Want to find coefficient that minimize the residuales
+
+Example using {manipulate} in module 18 to show line of best fit and minimizing the sum of squares
+
+```{r}
+library(manipulate)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+head(d)
+
+d <- mutate(d, centered_height = height - mean(height))
+d <- mutate(d, centered_weight = weight - mean(weight))
+
+p1 <- ggplot(data = d, aes(x = weight, y = height)) + geom_point()
+p2 <- ggplot(data = d, aes(x = centered_weight, y = centered_height)) + geom_point()
+
+p1 + p2
+
+slope.test <- function(beta1, data) { #plots beta value as slope of a line
+    g <- ggplot(data = data, aes(x = centered_weight, y = centered_height))
+    g <- g + geom_point()
+    g <- g + geom_abline(intercept = 0, slope = beta1, size = 1, colour = "blue",
+        alpha = 1/2)
+    ols <- sum((data$centered_height - beta1 * data$centered_weight)^2)
+    g <- g + ggtitle(paste("Slope = ", beta1, "\nSum of Squared Deviations = ", round(ols,
+        3)))
+    g
+}
+
+manipulate(slope.test(beta1, data = d), beta1 = slider(-1, 1, initial = 0, step = 0.005)) #Manipulate lets you pass in stuff such as a function which we made and then a slider which we can change, open with little gear icon, need to run in script window
+```
+
+Can solve for beta coefficients for a uni-variate regression using covariance, variance, and correlation (3 different methods). can use lm() to do predictions
+
+```{r}
+beta1 <- cor * (sd(d$height)/sd(d$weight))
+beta <- mean(d$height) - (beta1*mean(d$weight)) 
+m <- lm(height~weight, data = d) #does what we just did with b1 and b0
+```

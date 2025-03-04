@@ -44,3 +44,30 @@ CI <- function(x, level = 0.95) {
 v <- rnorm(10000, 25, 10)
 s <- sample(v, size = 40, replace = FALSE)
 CI(s)
+
+library(manipulate)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+head(d)
+
+d <- mutate(d, centered_height = height - mean(height))
+d <- mutate(d, centered_weight = weight - mean(weight))
+
+p1 <- ggplot(data = d, aes(x = weight, y = height)) + geom_point()
+p2 <- ggplot(data = d, aes(x = centered_weight, y = centered_height)) + geom_point()
+
+p1 + p2
+
+slope.test <- function(beta1, data) { #plots beta value as slope of a line
+  g <- ggplot(data = data, aes(x = centered_weight, y = centered_height))
+  g <- g + geom_point()
+  g <- g + geom_abline(intercept = 0, slope = beta1, size = 1, colour = "blue",
+                       alpha = 1/2)
+  ols <- sum((data$centered_height - beta1 * data$centered_weight)^2)
+  g <- g + ggtitle(paste("Slope = ", beta1, "\nSum of Squared Deviations = ", round(ols,
+                                                                                    3)))
+  g
+}
+
+manipulate(slope.test(beta1, data = d), beta1 = slider(-1, 1, initial = 0, step = 0.005)) #Manipulate lets you pass in stuff such as a function which we made and then a slider which we can change, open with little gear icon 
+
