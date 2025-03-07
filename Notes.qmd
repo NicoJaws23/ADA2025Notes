@@ -936,3 +936,154 @@ beta1 <- cor * (sd(d$height)/sd(d$weight))
 beta <- mean(d$height) - (beta1*mean(d$weight)) 
 m <- lm(height~weight, data = d) #does what we just did with b1 and b0
 ```
+
+# 3/6/2025 Introduction to Regression pt 2
+
+Beta coefficients
+
+From zombies: height \~ weight is our regression, height is Y, weight is X, Beta1 refers to the slope while Beta0 refers to the y-intercept, so we are figuring out then the line of best fit for our regression
+
+Summary output (see below) on the model object give output of what the model was and the estimates of the betas (intercept = beta0, value below intercept = beta1).
+
+Also get adjusted R-squared value which gives measure of the amount of variance in the Y variable that is explained by variance in the X variable (the unexplained variance), how closey observed Y values compare to what is predicted (also called mean squared error), high value = less unexplained variance, low value = more unexplained vairance
+
+```{r}
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+plot(x = d$weight, y = d$height)
+m <- lm(height ~ weight, data = d)
+summary(m) #lets us see summary of our lm() results
+names(m) #Names of everything returned as a result of lm()
+m$coefficients #Cal the 2 betas specifically
+m$fitted.values #Fitted values as predicted/fitted of height (Y) for each value of weight (X)
+m$residuals #Difference between predicted and actual values
+hist(m$residuals)
+plot(m)
+#tidy() from {broom} is helpful too, lets you pull out parts of summmary object
+tidy(m)
+glance(m)#also from {broom}
+confint(m) #calcs 95% CIs for beta coefficients for you, so you dont have to do it by hand (use to check work later)
+```
+
+How do we evaluate the significance of the slope? Not normal slope? Need to apply a transformation
+
+### Calculate SE of the regression Coefficients
+
+seB1 = sqrt(sum
+
+```{r}
+#SE by hand for height by weight
+```
+
+### Calc T stat and p value by Hand for regression
+
+t = estimate/standard error
+
+p value = 2\*pt(t, df = nrow-2)
+
+```{r}
+tB0 <- 39.6/.596
+tB1 <- 0.195019/0.004104
+pB1 <- pt(47.5, df = 998, lower.tail = FALSE) * 2
+```
+
+### Linear Regression Assumptions
+
+Sample is unbiased and representative of the populations
+
+Predictor variables are measured with no error
+
+Residuals have expected values (mean) of zero and are normally distributed (use QQ plots, Wilks-Shapiro, or Komolgorov-Smirnoff goodness of fit tests
+
+Relationship between the predictor variable and the response is not "nonlinear"
+
+Variance of the residuals is contrast across the range of predictor variables
+
+Multiple regression: Predictors are not highly correlated
+
+### Alternative to Ordinary Least Squares Regression
+
+Model II regression approaches, a line of best fit is chosen that minimizes in some way the direct distance of each point to the line of best fit
+
+```{r}
+#with zombies data and {lmodel2}\
+library(lmodel2)
+m2 <- lmodel2(height ~ weight, data = d, range.y = "relative", range.x = "relative", nperm = 1000)
+m2
+plot(m2)
+summary(m2)
+
+plot(x = d$weight, y = d$height) |>
+betas <- tidy(m2) |> #Can repeat this method but with different regression methods in filter() to plot multiple lines onto a plot
+  filter(method == "OLS") |>
+  pull(estimate)
+abline(betas, col = "blue")
+
+```
+
+Maximum likelihood estimation: Different approach, theoretically
+
+We want to find the parameter values (beta coefficients) for our regression model that maximize the probability of observing the data predictor variable values
+
+### Exercise
+
+ECV as Y, other variables as X (group size, longevity, juvenile period, reproductive lifespan)
+
+```{r}
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/Street_et_al_2017.csv"
+d <- read_csv(f)
+par(mfrow = c(2, 2))
+plot(x = d$Group_size, y = d$ECV)
+plot(x = d$Longevity, y = d$ECV)
+plot(x = d$Weaning, y = d$ECV)
+plot(x = d$Repro_lifespan, y = d$ECV)
+
+#b1 and b0
+d <- d |> 
+  filter(!is.na(ECV) & !is.na(Group_size))
+
+ECV_sd <- sd(d$ECV) #Y
+GS_sd <- sd(d$Group_size) #X
+
+b1 <- cor(d$Group_size, d$ECV) * (ECV_sd/GS_sd)
+b0 <- mean(d$ECV) - (b1*mean(d$Group_size))
+print(paste("Beta 1 =",b1, "; Beta 0 =",b0))
+
+#Confirm result
+m <- lm(ECV~Group_size, data = d)
+m1 <- lm(ECV~Longevity, data = d)
+m2 <- lm(ECV~Weaning, data = d)
+m3 <- lm(ECV~Repro_lifespan, data = d)
+#Calc b1 and b0 on filtered dataset by radiation
+regCof <- function(df, rad, x, y){
+  group <- df |>
+    filter(Taxonomic_group == rad)
+  sdX <- sd(group[[x]])
+  sdY <- sd(group[[y]])
+  b1 <- cor(group[[x]], group[[y]], use = "complete.obs") * (sdY/sdX)
+  b0 <- mean(group[[y]]) - (b1*mean(group[[x]]))
+  return(c(b1, b0))
+}
+
+#Use lm() on a filtered data set
+filtLM <- function(df, rad, x, y){
+  group <- df |>
+    filter(Taxonomic_group == rad)
+  ECVlm <- lm(group[[y]] ~ group[[x]])
+  return(ECVlm)
+}
+
+cattys <- regCof(d, "Catarrhini", "Group_size", "ECV")
+cattysLM <- filtLM(d, "Catarrhini", "Group_size", "ECV")
+cattysLM
+
+platys <- regCof(d, "Platyrrhini", "Group_size", "ECV")
+platysLM <- filtLM(d, "Platyrrhini", "Group_size", "ECV")
+platysLM
+
+strepys <- regCof(d, "Strepsirhini", "Group_size", "ECV")
+strepysLM <- filtLM(d, "Strepsirhini", "Group_size", "ECV")
+strepysLM
+```
+
+Comparing Beta1s give us test stats value, can use it to tell us differnce in relation between x and y for different group of primates
