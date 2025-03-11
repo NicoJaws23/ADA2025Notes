@@ -1087,3 +1087,130 @@ strepysLM
 ```
 
 Comparing Beta1s give us test stats value, can use it to tell us differnce in relation between x and y for different group of primates
+
+# 3/11/2025, Maximum Likelihood Estimation
+
+Ex 8 due on 3/13, this week we are finishing up with content in Module 19
+
+### MLE
+
+Find the parameter values that maximize the probability of observing the data
+
+Likelihood is just a PRODUCT of a set of probabilities of seeing each one of those datums (I see X Y and Z under some given model that generate the data, what is the probability of seeing that combination of values under that particular model)
+
+Messing with Gaussian (normal) process for most of this class, what is the probability of seeing this comination of data
+
+Using to figure out estimates for mu and sigma
+
+MLE Example with generated data set
+
+```{r}
+library(ggplot2)
+
+d <- tibble(val = rnorm(50, mean = 50, sd = 10))
+
+ggplot(d) +
+  geom_histogram(aes(x = val, y = after_stat(density))) + #after stat rescales to give density, not count
+    stat_function(fun = function(x) dnorm(x, mean = 65, sd = 10), color = "blue", linewidth = 1) +
+    stat_function(fun = function(x) dnorm(x, mean = 50, sd = 10), color = "red", linewidth = 1) #MLE is trying to go through parameter values for normal dist and determine what is the most likely set of parameters the data is drawn from
+
+mean <- mean(d$val)
+sd <- sd(d$val)
+
+#Likelihood of seeing value of 41 if mean = 50 and sd = 10
+val <- 41
+mean <- 50
+sd <- 10
+(likelihood <- 1/sqrt(2 * pi * sd^2) * exp((-(val - mean)^2)/(2*sd^2))) #MLE written out
+#OR
+(likelihood <- dnorm(val, mean, sd))
+
+#Log likelihood
+nll <- -1 * log(likelihood) #natural log
+(summed_nll <- sum(nll))
+
+#seeing 99 if mean = 50 sd =10
+val <- 99
+mean <- 50
+sd <- 10
+lh <- dnorm(val, mean, sd)
+```
+
+Now gonna use MLE to figure out what the best values are for mu and sigma
+
+PROTIP: Lower negative log likelihood is, the more likely it is to happen
+
+```{r}
+verbose_nll <- function(val, mu, sigma){
+  likelihood <- 0
+  for(i in 1:length(val)){
+    likelihood[[i]] = dnorm(val[[i]], mean = mu, sd = sigma)
+    ll <- log(likelihood)
+    message(paste0(val[[i]], " ", mean, " ", sd, " ", ll[[i]]))
+  }
+  nll <- -1 * sum(ll)
+  return(nll)
+}
+
+val <- c(70, 75, 50)
+mean <- 50
+sd <- 10
+
+verbose_nll(val, mean, sd) 
+
+simple_nll <- function(mu, sigma, verbose = FALSE){
+  ll = sum(dnorm(val, mean = mu, sd = sigma, log = TRUE))
+  nll <- -1 * ll
+  if(verbose == TRUE){
+    message(paste0("mean=", mu," sd=", sigma, " nll=", nll))
+  }
+  return(nll)
+}
+
+val <- c(70, 75, 50)
+mean <- 50
+sd <- 10
+simple_nll(mean, sd)
+#Still need to figure out what the best values are tho, above just calculate the likeihood of values appearing in a dataset with those parameters
+#Now we want to find mu and sigma
+#Now using {optim} package (which is in bbmle) so as to constrain sigma to be posotive by setting the lower bound to 0
+library(bbmle)
+
+val <- rnorm(50, mean = 50, sd = 10)
+
+mean(val)
+mle_norm <- mle2(minuslogl = simple_nll, start = list(mu = 0, sigma = 1), method = "SANN", trace = TRUE)#SNN is simulated anneadling method of optimization
+```
+
+### Permuting lm() for ex 8
+
+```{r}
+#Permuting lm data
+library(tidyverse)
+library(broom)
+library(mosaic)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+head(d)
+
+m <- lm(data = d, height ~ weight)
+tidy(m)
+obs_slope <- tidy(m) |>
+  filter(term == "weight") |>
+  pull(estimate)
+
+#using loop to permute
+nperm <- 1000
+perm <- do(nperm) * {
+  d_new <- d
+  d_new$weight <- sample(d_new$weight) #permute weight because we want to disassociate it with height, setting it so there is not relationship between the 2, i.e create null distribution
+  m <- lm(data = d_new, height ~ weight)
+  tidy(m) |>
+    filter(term == "weight") |>
+    pull(estimate)
+}
+hist(perm$result)
+
+permSE <- sd(perm$result)
+p <- sum(perm$result > abs(obs_slope) | perm$result < -1 * abs(obs_slope))/nperm
+```
