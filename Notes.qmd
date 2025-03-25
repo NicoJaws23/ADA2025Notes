@@ -1214,3 +1214,156 @@ hist(perm$result)
 permSE <- sd(perm$result)
 p <- sum(perm$result > abs(obs_slope) | perm$result < -1 * abs(obs_slope))/nperm
 ```
+
+## 3/25/2025, Elements of Regression
+
+Goal of regression is to partition variance in the outcome/response variable among different sources (ie explained by regression model itself versus the left-over error or residual variance)
+
+Can separate/partition the total variation in our y variable (sum of squares of y or SSY) into that explained by our model (regression sum of squares or SSR, deviation in estimated y values from the mean) and that which is left over as "error" (error sum of squares or SSE, deviation between observed and estimated y values)
+
+SSY = SSR + SSE
+
+Looking at this with the zombie data
+
+```{r}
+library(tidyverse)
+library(mosaic)
+library(broom)
+library(ggplot2)
+
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+
+#Simple regression model with lm()
+m <- lm(data = d, height ~ weight)
+
+#SSY = height - mean(height)
+SSY <- sum((m$model$height - mean(m$model$height))^2)
+
+#SSR = predicted height - mean height
+SSR <- sum((m$fitted.values - mean(m$model$height))^2)
+
+#SSE = height - predicted height
+SSE <- sum((m$model$height - m$fitted.values)^2)
+
+SSY2 <- SSR + SSE
+```
+
+ANOVA: Mean Square, calculating average sum of squares
+
+Calculating variance in each of these 3 components by dividing the sum of squares by its corresponding \# of degrees of freedom, SSY DF = n-1, SSR DF = number of predictor variables (p), SSE DF = n-(p+1) (i.e. n-p-1)
+
+```{r}
+#ANOVA
+
+#mean overall variance
+MSY <- SSY/(nrow(d) - 1)
+
+#mean variance explained by regression equations
+MSR <- SSR/(1)
+
+#mean remaining variance
+MSE <- SSE/(nrow(d) - 1 - 1)
+
+#fratio: ratio of the explained to unexplained variance, high value means that regression explains a lot of the variance, low means variance is not very well explained. This is out test statistic
+fratio <- MSR/MSE
+
+
+#p value - proportion of F distribution that lies between 0 and fratio, pf() tells us what proportion of our f-dist is to the right of the fratio (larger)
+pval <- pf(q = fratio, df1 = 1, df2 = 998, lower.tail = FALSE) 
+#OR
+pval2 <- 1 - pf(q = fratio, df1 = 1, df2 = 998)
+plotDist("f", df1 = 1, df2 = 998, col="orange") #plotting an f-distrubution
+
+(rsq <- SSR/SSY)
+summary(m) #looks at multiple R-squared value
+
+(x <- anova(m))
+
+#Practice with uncorrelated random data
+new_d <- tibble(x = rnorm(1000, mean = 100, sd =25), y = rnorm(1000, mean = 10, sd = 2))
+plot(new_d$x, new_d$y)
+m2 <- lm(y ~ x, data = new_d)
+summary(m2)
+
+#SSY = height - mean(height)
+SSY <- sum((m2$model$y - mean(m$model$y))^2)
+
+#SSR = predicted height - mean height
+SSR <- sum((m2$fitted.values - mean(m$model$y))^2)
+
+#SSE = height - predicted height
+SSE <- sum((m2$model$y - m2$fitted.values)^2)
+
+#mean overall variance
+MSY <- SSY/(nrow(new_d) - 1)
+
+#mean variance explained by regression equations
+MSR <- SSR/(1)
+
+#mean remaining variance
+MSE <- SSE/(nrow(new_d) - 1 - 1)
+
+fratio <- MSR/MSE
+pval <- pf(q = fratio, df1 = 1, df2 = 998, lower.tail = FALSE) 
+
+anova(m2)
+```
+
+### Model Checking
+
+4 conditions for inference:
+
+"L"inearity of relationship between variables (no curves, results match up with line of best fit)
+
+"I"ndependence of residuals
+
+"N"ormality of residuals (look at histogram, should be centered at 0)
+
+"E"quality of variance ("homoscedasticity") of the residuals, residuals show constant variance across the range of explainatory variable
+
+L, N, and E can be evaluated by residual analysis, I depends on how data were collected
+
+Pass model object through plot() and look at the plots to make sure they follow L, N, and E
+
+### EX 9 Coding Challenge
+
+```{r}
+library(tidyverse)
+library(car)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/KamilarAndCooperData.csv"
+d <- read_csv(f)
+par(mfrow = c(2,2))
+plot(d$Body_mass_female_mean, d$MaxLongevity_m)
+
+m1 <- lm(MaxLongevity_m ~ Body_mass_female_mean, data = d)
+plot(m1)
+car::qqPlot(m1)
+m2 <- lm(MaxLongevity_m ~ log(Body_mass_female_mean), data = d)
+plot(m2)
+car::qqPlot(m2)
+m3 <- lm(log(MaxLongevity_m) ~ log(Body_mass_female_mean), data = d)
+plot(m3)
+car::qqPlot(m3)
+
+
+shapiro.test(m1$residuals)
+shapiro.test(m2$residuals)
+shapiro.test(m3$residuals)
+
+```
+
+### Categorical Predictors
+
+Can use discrete/categorical explanatory variables made up of 2 or more groups that are coded as "factors".
+
+Using AVONET dataset, Ex 10
+
+```{r}
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/AVONETdataset1.csv"
+d <- read_csv(f, col_names = TRUE)
+
+df <- d |>
+  select(Species1, Family1, Order1, Beak.Width, Beak.Depth, Tarsus.Length, Wing.Length, Tail.Length, Mass, Habitat, Migration, Trophic.Level, Trophic.Niche, Min.Latitude, Max.Latitude, Centroid.Latitude, Range.Size)
+glimpse(df)
+```
