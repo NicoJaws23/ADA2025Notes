@@ -1367,3 +1367,115 @@ df <- d |>
   select(Species1, Family1, Order1, Beak.Width, Beak.Depth, Tarsus.Length, Wing.Length, Tail.Length, Mass, Habitat, Migration, Trophic.Level, Trophic.Niche, Min.Latitude, Max.Latitude, Centroid.Latitude, Range.Size)
 glimpse(df)
 ```
+
+## 3/27/2025, Regression w/ categorical predictors
+
+\*\*Ex 10 due 4/4 by 5pm
+
+Ex with avonet data sex
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/AVONETdataset1.csv"
+d <- read_csv(f, col_names = TRUE)
+
+df <- d |>
+  select(Species1, Family1, Order1, Beak.Width, Beak.Depth, Tarsus.Length, Wing.Length, Tail.Length, Mass, Habitat, Migration, Trophic.Level, Trophic.Niche, Min.Latitude, Max.Latitude, Centroid.Latitude, Range.Size)
+glimpse(df)
+
+#Categorical variables: Species1, Family1, Order1, Habitat, Trophic.Level, Trophic.Niche, Migration (migration is the only numceric)
+
+#Whether or not and which variables predict body mass
+
+#plots, use drop_na to get rid of na observations
+#trophic level in relation to log(Mass)
+tlM <- ggplot(data = df |> drop_na(Trophic.Level), aes(x = Trophic.Level, y = log(Mass))) +
+  geom_boxplot() +
+  geom_jitter()
+
+#Migration (as factor) in relation to log(Mass)
+mm <- ggplot(data = df |> drop_na(Migration), aes(x = as.factor(Migration), y = log(Mass))) +
+  geom_boxplot() +
+  geom_jitter()
+
+hm <- ggplot(data = df |> drop_na(Habitat), aes(x = Habitat, y = log(Mass))) +
+  geom_boxplot() +
+  geom_jitter()
+plot_grid(tlM, mm, hm)
+```
+
+Running linear models
+
+Trophic level has 4 different categories (carnivoure, herbivore, omnivore, scavenger) . Carnivore (because it is first alphabetically) is listed as the base level category, intercept is telling us average for base level category, other values are how they compare to the mean of the base level category. Based on p-values from m1, herbivores and scavengers are significantly difference from carnivores
+
+```{r}
+m1 <- lm(log(Mass) ~ Trophic.Level, data = df)
+m2 <- lm(log(Mass) ~ as.factor(Migration), data = df)
+#OR mutate migration to factor first
+df <- df |>
+  mutate(Migration = as.factor(Migration))
+m2 <- lm(log(Mass) ~ Migration, data = df)
+summary(m1)
+summary(m2)
+```
+
+Post-hoc test: After finding significant omnibus (is there an effects of categorical effect) F stat in an ANOVA, er can use pairwie t-tests or Tukey Honest Siginificant Differences test to determine what groups means are different from one another
+
+Doing p-value correction based on the number of comparissions being made (bonferroni)
+
+```{r}
+(pairwise.t.test(log(df$Mass), d$Trophic.Level, p.adj = "bonferroni"))
+m1aov <- aov(log(Mass) ~ Trophic.Level, data = d)
+(posthoc <- TukeyHSD(m1aov, which = "Trophic.Level", conf.level = 0.95))
+```
+
+Permutation approach with inference in ANOVA using {infer}
+
+```{r}
+library(infer)
+original.F <- aov(aov(log(Mass) ~ Trophic.Level, data = df)) |>
+                    broom::tidy()|>
+                    filter(term == "Trophic.Level")
+original.F #F stat is "statistic"
+
+#Permutation distribution using {infer}
+df <- df |> mutate(logMass = log(Mass))
+permuted.F <- df |>
+  specify(logMass ~ Trophic.Level) |>
+  hypothesize(null = "independence") |>
+  generate(reps = 1000, type = "permute") |>
+  calculate(stat = "F")
+visualize(permuted.F) +
+  shade_p_value(obs_stat = original.F$statistic, direction = "greater")
+p.value <- permuted.F |>
+  get_p_value(obs_stat = original.F$statistic, direction = "greater")
+```
+
+### Multi-factor ANOVA (2 way ANOVA)
+
+Sometime we want to look at data which is characterized by multiple variable (ex trophic level AND migration). Testing several null hypotheses at once
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+#Still using bird data
+d <- read_csv(f, col_names = TRUE)
+#Makeing 2 regression equations and assigning residuals to new variables
+d <- d |>
+  mutate(Beak.Length_CulmenLog = log(Beak.Length_Culmen), Tarsus.LengthLog = log(Tarsus.Length))
+
+m1 <- lm(Beak.Length_CulmenLog ~ log(Mass), data = d)
+
+m2 <- lm(Tarsus.LengthLog ~ log(Mass), data = d)
+
+d <- d |>
+  mutate(blcRes = m1$residuals, tlRes = m2$residuals)
+
+ggplot(data = d, mapping = aes(x = Primary.Lifestyle, y = tlRes)) +
+  geom_boxplot()
+
+ggplot(data = d, mapping = aes(x = Trophic.Niche, y = blcRes)) +
+  geom_boxplot()
+```
