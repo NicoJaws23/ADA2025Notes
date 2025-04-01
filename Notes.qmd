@@ -1479,3 +1479,43 @@ ggplot(data = d, mapping = aes(x = Primary.Lifestyle, y = tlRes)) +
 ggplot(data = d, mapping = aes(x = Trophic.Niche, y = blcRes)) +
   geom_boxplot()
 ```
+
+## 4/1/2025, ANOVAssssss
+
+Multifactor ANOVA: 2 or more categorical predictors in response to a variable
+
+Working on EX 10
+
+### Multiple Linear Regression and ANCOVA
+
+Install {car} and {jtools}
+
+MLR and ANCOVA we are looking to model a response variable in terms of more than 1 predictor variable (at least one of which is continuose)
+
+EX with zombie data
+
+```{r}
+library(car)
+library(jtools)
+library(tidyverse)
+
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+
+
+m <- lm(height ~ weight + age, data = d) #Multiple linear regression
+summary(m)
+plot(m$model$weight, residuals(m))
+plot(m$model$age, residuals(m))
+plot(fitted(m), residuals(m))
+summary(aov(m))
+
+#adding in third predictor
+vif(m)
+m2 <- lm(height ~ weight + age + gender, data = d)
+summary(m2)
+boxplot(residuals(m2) ~ m2$model$gender)
+
+#Checking for colinearity can be done with vif(), want to understand if combination variables/predictrs are highly correlated or not, calculating variance inflaction facotrs, how easily each predictors is predicted by combo of other predictors. Can use vif() function in {car}. If it exceeds 5, there is high/problimatic amount of colineariy
+vif(m2)
+```
