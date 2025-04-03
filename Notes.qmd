@@ -1519,3 +1519,111 @@ boxplot(residuals(m2) ~ m2$model$gender)
 #Checking for colinearity can be done with vif(), want to understand if combination variables/predictrs are highly correlated or not, calculating variance inflaction facotrs, how easily each predictors is predicted by combo of other predictors. Can use vif() function in {car}. If it exceeds 5, there is high/problimatic amount of colineariy
 vif(m2)
 ```
+
+## 4/3/2025, Multiple Regression and ANCOVA
+
+Using {car} and {jtools}.
+
+vif() testing for multi-co-linearity. = (1)/(1 - R-squared of regression)
+
+Equation for predicting mean height from the three predictor variables (using data from code chunk above). Using regression coefficients to write equations. Mean height = 0.141\*weight + 0.662\*age + 1.61\*gender(0 or 1) + 33.3
+
+Doing some stuff with bird dataset. What is an equation we could write to predict range size?
+
+logRangeSize = 13.25 + 0.2650(logMass) - 0.33\*1/0 - 1.31\*1/0 - 0.33\*1/0
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+library(car)
+library(skimr)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/AVONETdataset1.csv"
+a <- read_csv(f, col_names = TRUE)
+
+a <- a |>
+  filter(Order1 == "Accipitriformes") |>
+  mutate(logRange = log(Range.Size), logMass = log(Mass))
+
+skim(a)
+
+m1 <- lm(logRange ~ logMass + as.factor(Primary.Lifestyle), data = a)
+summary(m1)
+```
+
+### CIs and Prediction Intervals
+
+PIs rep our uncertainty about actual new predicted values for the response at each value/set of values of the explanatory variables(s)
+
+CI is based around the estimate/mean.
+
+We can use the predict() function to determine both the CI for the predicted mean response and PI for individual responses at a given values of x
+
+predict() takes the model object, a set of newdata, an interval type, and a confidence level as arguments
+
+```{r}
+library(car)
+library(jtools)
+library(tidyverse)
+
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+
+
+m <- lm(height ~ weight + age + gender, data = d) #Multiple linear regression
+summary(m)
+
+h <- 31.76 + (0.16*132) + (0.62*29) + (1.609*1)
+#Need to figure out confidence interval of this, can use predict
+ci <- predict(m, newdata = data.frame(age = 29, gender = "Male", weight = 132), interval = "confidence", level = 0.95) #Givs us confidence interval basd around estimate
+
+pi <- predict(m, newdata = data.frame(age = 29, gender = "Male", weight = 132), interval = "prediction", level = 0.95) #wider interval for prediction interval
+#Could pass data frame with multiple values on it
+(p <- ggplot(data = d, aes(x = age, y = height)) + 
+    geom_point() +
+    geom_smooth(method = lm))
+
+#Effects plots, in {jtools}
+#simple modes
+m <- lm(height ~ age + weight + gender, data = d)
+
+effect_plot(m, pred = age, interval = TRUE, int.type = "confidence", int.width = 0.95, plot.points = TRUE) #accounting for variance of height in relation to predictors
+
+#effect tools is good for plotting the relationships between predictors
+#plots_summs is cool tool
+plot_summs(m,
+           plot.distributions = TRUE,
+           rescale.distributions = TRUE,
+           colors = "green") #plots regression coefficients associated with each predictors and CIs, can add multiple models to the function and all will be on the same plot. allows to visually compare multiple models
+```
+
+### Model Selection
+
+Need to evaluate explanatory variables and alternative models in order to establish which are best able to describe the response.
+
+Number of different algorithms to do this, forward and backward selection, F ration tests, information criteria approaches.
+
+Different approaches may result in different parameters being included in the final model. Lots of different packages that we can use to combine results from several different models.
+
+Can do model averaging which averages the coefficients of models to come up with better assessment of whats going on
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(AICcmodavg)
+library()
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/AVONETdataset1.csv"
+d <- read_csv(f, col_names = TRUE)
+d <- d |>
+  mutate(logMass = log(Mass), logRS = log(Range.Size), logBeak = log(Beak.Length_Culmen), logTarsus = log(Tarsus.Length), Migration = as.factor(Migration))
+#Looking at 2 or more nested models to do model eval using partial F tests
+#MOdels
+m1 <- lm(data = d, logBeak ~ logRS * Migration)
+m2 <- lm(data = d, logBeak ~ logRS + Migration)
+m3 <- lm(data = d, logBeak ~ logRS)
+m4 <- lm(data = d, logBeak ~ Migration)
+m5 <- lm(data = d, logBeak ~ 1)
+
+#Do partial F ration test with anova()
+anova(m2, m1, test = "F") #Testing complexity of models
+```
