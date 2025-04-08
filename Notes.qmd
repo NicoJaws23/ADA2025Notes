@@ -715,7 +715,7 @@ We have the means for each group, the sd for each group and the number of cases
 MaleMean <- mean(dM$kernel95)
 FemaleMean <- mean(dF$kernel95)
 mu <- 0
-sp2 <- (((Male-1)*(sd(dM$kernel95)^2))+((Female - 1)*(sd(dF$kernel95)^2)))/df
+sp2 <- (((Male -1)*(sd(dM$kernel95)^2))+((Female - 1)*(sd(dF$kernel95)^2)))/df
 Male <- 9
 Female <- 11
 df <- Male + Female - 2
@@ -1626,4 +1626,113 @@ m5 <- lm(data = d, logBeak ~ 1)
 
 #Do partial F ration test with anova()
 anova(m2, m1, test = "F") #Testing complexity of models
+```
+
+## 4/8/2025 Model Selection and Generalized Linear Models
+
+Working through AVONET data to mess with model selection
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(AICcmodavg)
+library(MuMIn)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/AVONETdataset1.csv"
+d <- read_csv(f, col_names = TRUE)
+d <- d |>
+  mutate(logMass = log(Mass), logRS = log(Range.Size), logBeak = log(Beak.Length_Culmen), logTarsus = log(Tarsus.Length), Migration = as.factor(Migration))
+#Looking at 2 or more nested models to do model eval using partial F tests
+#MOdels
+relBeak <- lm(logBeak ~ logMass, data = d)
+relTarsus <- lm(logTarsus ~ logMass, data = d)
+d <- d |>
+  mutate(relBeak = relBeak$residuals, relTarsus = relTarsus$residuals)
+
+m1 <- lm(data = d, logBeak ~ logRS * Migration)
+m2 <- lm(data = d, logBeak ~ logRS + Migration)
+m3 <- lm(data = d, logBeak ~ logRS)
+m4 <- lm(data = d, logBeak ~ Migration)
+m5 <- lm(data = d, logBeak ~ 1) #null model b/c there are no predictors
+
+#Do partial F ration test with anova()
+anova(m2, m1, test = "F") #Testing complexity of models
+#Produces table with F-stat and p-value telling us how significant each test is
+#How do we interpret the results (low p-value and high F-stat)? The interaction of the two terms adds signficant explanatory power compared to the less complext model
+anova(m3, m2, test = "F") #Produces error because we are running two models on different sized data set due to differences in scoreing, need to drop nas
+
+d_new <- d |> drop_na(logRS, Migration)
+m1 <- lm(data = d_new, logBeak ~ logRS * Migration)
+m2 <- lm(data = d_new, logBeak ~ logRS + Migration)
+m3 <- lm(data = d_new, logBeak ~ logRS)
+m4 <- lm(data = d_new, logBeak ~ Migration)
+m5 <- lm(data = d_new, logBeak ~ 1)
+
+anova(m3, m2, test = "F") #These models dont actually tell us how much explanatory power logRS adds over anything else, need to compare model with logRS to model without logRS
+```
+
+### Forward/Backward Selection
+
+Will be exploring variables from AVONET that best predict relative beak length.
+
+Forward selection starts with intercept model and then adds each predictro to see how they each improves the goodness-of-fit.
+
+First we create a null model and then use the add1() function to individually test each model against the null
+
+```{r}
+
+d_new <- d |> drop_na(logRS, Migration, Trophic.Level, relTarsus, logTarsus, Primary.Lifestyle)
+
+#This is the forward selection process
+#To start, null model
+m_null <- lm(data = d_new, relBeak ~ 1)
+#Now use add1()
+add1(m_null, scope = .~. + logRS + relTarsus + Migration + Trophic.Level + Primary.Lifestyle, test = "F") #How do we read the table? Primary.Lifestyle has the largest F-value and smallest unexplained variance, so it should be included in more complex model first because it adds the most explanatory power
+
+#Now we use the update() model to add to our null model, and then we will test this new model with more predictors
+m1 <-update(m_null, formula = .~. + Primary.Lifestyle)
+add1(m1, scope = .~. + logRS + relTarsus + Migration + Trophic.Level, test = "F") #Based on this, Trophic.Level adds in a significant amount of explanatory power
+m2 <- update(m1, formula = .~. + Trophic.Level)
+add1(m2, scope = .~. + logRS + relTarsus + Migration, test = "F")
+
+m3 <- update(m2, formula = .~. + Migration)
+add1(m3, scope = .~. + logRS + relTarsus, test = "F")
+#logRS and relTarsus do not add any explanatory power, m3 is the best model
+
+##This is backwards selection
+#Starts with fullest model and systematically drops terms that do not contribute to the explanatory value of the model. We use the functions drop1() and update() for this. Determining which predictors can be dropped due to least explanatory power. It is basically the same workflow, except instad of add1(), we use drop1()
+
+```
+
+### Shortcut Model Selection is AICC
+
+Using {MASS} package, AICC is a way of comparing amoung different models at the same time, can do a full or a null model
+
+```{r}
+#Full model example
+m_full <- lm(data = d_new, relBeak ~ logRS + relTarsus + Migration + Trophic.Level + Primary.Lifestyle)
+
+s <- stepAIC(m_full, scope = .~., direction = "both") #If we take out minuses and add pluses, the AICC values becomes greater, which we dont want, so we keep the model with the lowest AICC, says best mode is (relBeak ~ relTarsus + Migration + Trophic.Level + Primary.Lifestyle)
+
+#Null model
+m_null <- lm(data = d_new, relBeak ~ 1)
+n <- stepAIC(m_null, scope = .~. + logRS + relTarsus + Migration + Trophic.Level + Primary.Lifestyle, direction = "both")
+```
+
+### MuMIn for Model Selection
+
+Using {MuMIn} function dredge() which explores subsets of a given global model in an automated way. First run full model, then run it through dredge(), \*\*need to set na.action in model before passing it through dredge(). Ranked in order of ascending AICC values, best model is the first one listed.
+
+```{r}
+m_full <- lm(data = d_new, relBeak ~ logRS + relTarsus + Migration + Trophic.Level + Primary.Lifestyle, na.action = na.fail)
+
+mods <- dredge(m_full)
+
+#Averagin models
+mods.avg <- summary(model.avg(mods, subset = delta <= 4, fit = TRUE))
+
+aictab(models, mod.names)
+
+mods.avg$msTable
+plot(mods.avg)
+confint(mods.avg) #95% CIs
 ```
