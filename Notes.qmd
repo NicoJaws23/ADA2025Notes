@@ -1736,3 +1736,116 @@ mods.avg$msTable
 plot(mods.avg)
 confint(mods.avg) #95% CIs
 ```
+
+## 4/10/2025, Generalized Linear Modeling
+
+Assignments left: ex11 (4/17), ex12 (4/24), collaborative data science project (5/5), creative data viz (5/5), extra credit (5/2)
+
+Data science project, group of 3, have group and plan by next tuesday
+
+option A: explore a method we havent looked at
+
+Also need to develop our own R package, bundling data and functions all into something that can be easily distributed
+
+option B: do something with group members data
+
+Extending models to be more "generalized", extend simple linear regression to allow the expected value of our response variable to depend on our predictor variable(s) through what is called a link function
+
+Good for using when we have different kinds of response variables, like binary or count data. So now we are not using an ordinary least squared method, instead we use maximum likelihood or Bayesian approaches. Trying to estimate value of regression parameters that best fit the data that we have
+
+3 components: Linear component, error structure or random component, a link function
+
+Linear component yields a predicted value but this value is not the predicted value of our reponse variable Y. Predicted value needs to be transformed back into a predicted Y by applying the inverse of the link function. Calculating getting an "odds ratio", the odds of getting a 0 or 1
+
+Identity/log/logit link, use depends on the data being used/looked for
+
+GLM is fitted with maximum likelihood process which is a iterative process. Data are taken as a given and we are trying to find most likely parameter values and a model to fit those data
+
+### Logistic Regression
+
+Used when response variable is a binary variable, modeling pi(subi), probability that Y equal 1 for a given value of x
+
+Errors/residuales are not normally distributed, they have a binomial distribution
+
+Logit transformation is the link function connecting Y to our predictors\\
+
+EX: Titanic data
+
+```{r}
+library(tidyverse)
+library(skimr)
+library(ggplot2)
+library(cowplot)
+library(broom)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/titanic_train.csv"
+d <- read_csv(f, col_names = TRUE)
+d <- d |>
+  select(Survived, Pclass, Name, Sex, Age, SibSp, Parch, Fare, Embarked) |>
+  mutate(Pclass = as.factor(Pclass), Sex = as.factor(Sex), Embarked = as.factor(Embarked))
+#survival in relation to age, sex, pclass
+ageS <- ggplot(data = d, mapping = aes(x = Survived, y = Age))+
+  geom_point() +
+  ggtitle("Age and Survival")
+
+sexS <- ggplot(data = d, mapping = aes(x = Sex, y = Survived))+
+  geom_violin() +
+  ggtitle("Sex and Survival")
+
+classS <- ggplot(data = d, mapping = aes(x = Pclass, y = Survived))+
+  geom_violin() +
+  ggtitle("Class and Survival")
+
+plot_grid(ageS, sexS, classS)
+
+m1 <- glm(data = d, Survived ~ Sex, family = "binomial")
+summary(m1) #We can use this model to build an equation
+#log(odds of surviving/no surviving) = 1.056 + (-2.5*1 if Male) | (-2.5*0 if Female)
+#Translated to odds: exp(log(odds of surviving/no surviving)) = exp(1.056 + (-2.5*1 if Male) | (-2.5*0 if Female))
+tidy(m1)
+confint(m1)
+
+coefs <- tidy(m1) |> select(estimate)
+logOR_female_survival <- coefs$estimate[1] + coefs$estimate[2] * 0 
+logoR_male_survival <- coefs$estimate[1] + coefs$estimate[2] * 1
+
+OR_female_survival <- exp(logOR_female_survival)
+OR_male_survival <- exp(logoR_male_survival) #This gives you odds of surviving, ratio of probability of occurance
+
+PR_female_survival <- OR_female_survival/(1 + OR_female_survival)
+PR_male_survivial <- OR_male_survival/(1 + OR_male_survival) #Here then is the probability of survival, can be thought of as a percent
+
+
+```
+
+### Interpretation
+
+Beta1 of logitisc regress reps change in the log(odds ratio) of the outcome for an increase in one unit of our predictor variable, X or for the change in the log(odds ratio) for being associated with a particular group relative to the baseline level (if X is categorical)
+
+preduct() function can fit the change in the survived/did not survivie ratio by sex
+
+```{r}
+x <- data.frame(Sex = c("male", "female"))
+logOR <- predict(m1, newdata = x)
+OR <- exp(logOR)
+y <- predict(m1, newdata = x, type = "response", se.fit = TRUE)
+```
+
+Doing above with surival with age insteead
+
+```{r}
+m <- glm(Survived ~ Age, data = d, family = "binomial")
+summary(m)
+
+tidy(m)
+confint(m)
+
+coefs <- tidy(m)
+coefs$estimate[2] #pulling out age coefficient
+exp(coefs$estimate[2]) #exponentiating coefficient
+
+
+s <- predict(m)
+g <- exp(s)
+
+y <- predict(m, n)
+```
