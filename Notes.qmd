@@ -1849,3 +1849,101 @@ g <- exp(s)
 
 y <- predict(m, n)
 ```
+
+## 4/15/2025, Generalized Linear Modeling (continued)
+
+Challenge to see how survival is related to Pclass
+
+```{r}
+library(tidyverse)
+library(skimr)
+library(ggplot2)
+library(cowplot)
+library(broom)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/titanic_train.csv"
+d <- read_csv(f, col_names = TRUE)
+d <- d |>
+  select(-c(PassengerId, Ticket, Cabin)) |>
+  mutate(Pclass = as.factor(Pclass), Sex = as.factor(Sex), Embarked = as.factor(Embarked))
+
+#Looking at relationship between survival and passenger class, need to add binomial for family
+m <- glm(Survived ~ Pclass, data = d, family = "binomial")
+summary(m) #results indicate that passenger class is significant, estimate give us log(odds ratio), log(odds ratio) = 0.5306 + (-0.6394*0 if not pclass2, 1 if pclass2) + (-1.6704* 0 if not pclass3, 1 if pclass3)
+
+#What are the predicted odds of survival for a passenger in 1st class?
+exp(0.5306)
+
+tidy(m)
+confint(m)
+
+coefs <- tidy(m) |> select(estimate)
+logOR_pclass1_survival <- coefs$estimate[1] + coefs$estimate[2] * 0 + coefs$estimate[3] * 0
+logoR_pclass2_survival <- coefs$estimate[1] + coefs$estimate[2] * 1 + coefs$estimate[3] * 0
+logoR_pclass3_survival <- coefs$estimate[1] + coefs$estimate[2] * 0 + coefs$estimate[3] * 1
+ORclass1 <- exp(logOR_pclass1_survival)
+ORclass2 <- exp(logoR_pclass2_survival)
+ORclass3 <- exp(logoR_pclass3_survival)
+
+x <- data.frame(Pclass = c("1", "2", "3"))
+logOR <- predict(m, newdata = x) #get log odds
+OR <- exp(logOR) #get odds
+PrS_C1 <- OR[1]/(1+OR[1]) #get probability
+PrS_C2 <- OR[2]/(1+OR[2])
+PrS_C3 <- OR[3]/(1+OR[3])
+
+
+PrS <- predict(m, newdata = x, type = "response")# gives vector of probability because of type = "response"
+
+#Adding in sex, so now 2 predictors
+m1 <- glm(Survived ~ Sex + Pclass, data = d, family = "binomial")
+summary(m1)
+tidy(m1)
+confint(m1)
+
+x <- data.frame(Sex = c("male"), Pclass = c("3")) #need to specify the data set, can pass a more complext data frame which has every combo of sex and class to get all of the predictions at once
+logOR <- predict(m1, newdata = x) #get log odds
+exp(logOR)
+Prs <- predict(m1, newdata = x, type = "response")
+```
+
+### Deviance rather than variance
+
+Measure of discrepancy used in a GLM to asses the goodness of fit of the model to the data is called the deviance, which is an analog of variance in a general linear model
+
+Deviance is defined as 2\*(the log-liklihood of a "fully saturated" model minus the log-liklihood of the proposed model)
+
+Deviance can be calculted functionally as -2(log-liklihood of the porposed model)
+
+For GLMs we can use a liklihood ratio test (LRT, similar to F ratio test) to compare the ratio of likelihoods (as opposed to the ratio of explained variaance. Can use lrtest() from {lmtest} or anova() with test = "Chisq"
+
+```{r}
+library(lmtest)
+lrtest(m, m1) #Comparing our 2 models, Chisq reps the deviance score between the 2 models, results suggest the explained deviance associated with adding in sex as a predictor is high
+anova(m, m1, test = "Chisq") #Maybe use this for bio anth analysis comparing models
+```
+
+### Poisson Regression
+
+Sometimes we want to model a response variable that is in the form of count data. Many discrete response variables hav counts as possible outcomes.
+
+Binomial counts are the number of successes, x, in a fixed number of trials, n
+
+Poisson counts are the number of occurrences of some event in a certain interval or time
+
+Binomial counts only take values between 0 and n, Poisson counts have no upper bound
+
+For poisson distributed varaibles, the mean and variance are equal and represented by a single parameter (lambda). We can sometimes log transform the response variables and then use a GLM with a Poisson error term. Same process as logistic regression, but family = "Poisson"
+
+Ex with woolly data, reproductive success as a function o age
+
+```{r}
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/woollydata.csv"
+d <- read_csv(f, col_names = TRUE)
+p <- ggplot(data = d, aes(x = age, y = success)) +
+  geom_point()
+#First regression
+glm <- glm(success ~ age, data = d, family = "poisson")
+summary(glm)
+results <- tidy(glm) #Does this model explain a significant amount of variance? Can test with liklihood ratio test
+lrtest(glm)
+```
