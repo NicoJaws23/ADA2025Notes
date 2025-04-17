@@ -1947,3 +1947,90 @@ summary(glm)
 results <- tidy(glm) #Does this model explain a significant amount of variance? Can test with liklihood ratio test
 lrtest(glm)
 ```
+
+## 4/17/2025, Mixed Effects Modeling
+
+Final extension of linear regression modelling is "multilevel" or "mixed effects" modeling
+
+Linear Mixed Models (LMM) and Generalized Linear Mixed Models (GLMM). Looking at effects of various factors and their levels on the response variable. Data has response variable and multiple measure of predictors as additional sources of variance (Tony's video game example). Modeling this with mixed effects modeling, either with fixed or random factors
+
+Fixed factors affect all levels of interest, random effects are those that represent only a sample of the levels of interest (ID)
+
+ANOVA and ANCOVA looks only at fixed factors, we are adding in some random factors. Making up for having not sampled across individuals equally.
+
+Using Mixed Effects:
+
+Broadens the scope of inferences, can use stats methods to infer something about the populationn from which the levels of the random factos have been drawn.
+
+Random effects naturally incorporates dependence in the model and helps us account for pseudo-replication in dataset. Observations that share the same level of the random effects are explicityl modeled as being correlated. Great for dealing with tmie series data, spatially correlated data, or situation where we have repeated observations/measures from the same subjects or sampling units.
+
+Incorporating random factors requires the use of more sophisticated estimation and fitting methods
+
+Addressing non-independece by estimating a different set of parameters for each level of the random factor ("subject")
+
+Example with Chimp data, assumption that grooming received is "normalized"
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(skimr)
+library(cowplot)
+library(lme4)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/chimpgrooming.csv"
+d <- read_csv(f, col_names = TRUE)
+skim(d)
+names(d)
+
+a <- ggplot(data = d, mapping = aes(x = subject, y = duration)) +
+  geom_boxplot()
+b <- ggplot(data = d, mapping = aes(x = reprocondition, y = duration)) +
+  geom_boxplot()
+c <- ggplot(data = d, mapping = aes(x = parity, y = duration, color = reprocondition)) +
+  geom_boxplot()
+plot_grid(a, b, c)
+
+ggplot(data = d, mapping = aes(x = reprocondition, y = duration, color = subject)) +
+  geom_boxplot()
+
+
+
+
+#Random intercept model
+m <- lmer(data = d, duration ~ reprocondition + parity + (1|subject))
+summary(m) #Shows us the formula used, how the regression coefficints were calculates, goes over variation accounted for by random effects (subject) and fixed effects (reprocondition, parity)
+
+
+
+#Likliehood ratio test, looking for probability of seeing the data we have actually collected given a particular model. Comparing the likelihood of two models with each other, comparing fuller model to reduced model
+
+fuller <- lmer(data = d, duration ~ reprocondition + parity + (1|subject), REML = FALSE)
+
+reduced <- lmer(data = d, duration ~ parity + (1|subject), REML = FALSE)
+
+anova(reduced, fuller, test = "Chisq") #result of this anova shows that differnce in likeihood between these two shows that adding reprocondition is a stronger model, had more predictive power, lower AIC of fuller model indicates it is a better model
+
+
+#Random slopes mode: how relationsip between the response variable and predictor variables vary from subject to subject. Notation of (1 + fixed|random) tells model to estimate differing baseline levels of the response as well as differing responses to the fixed factor in question. isSingular warning indicates that the effects dont explain a lot of varience
+m3 <- lmer(data = d, duration ~ reprocondition + parity + (1+ reprocondition|subject) + (1+parity|subject), REML = FALSE)#how everything can vary by each subject
+summary(m3)
+#Can use LRT for inferences
+full <- lmer(data = d, duration ~ reprocondition + parity + (1+ reprocondition|subject) + (1+parity|subject), REML = FALSE)
+minusRC <- lmer(data = d, duration ~ parity + (1+ reprocondition|subject) + (1+parity|subject), REML = FALSE)
+minutP <- lmer(data = d, duration ~ reprocondition + (1+ reprocondition|subject) + (1+parity|subject), REML = FALSE)
+
+anova(minusRC, full, test = "Chisq")
+anova(minutP, full, test = "Chisq")
+
+#comparing models using AICcmodavg
+null <- lmer(data = d, duration ~ (1+reprocondition|subject) + (1+parity|subject), REML = FALSE)
+library(AICcmodavg)
+(aic_table <- aictab(list(full, minusRC, minutP, null), modnames = c("full", "minusRC", "minutP", "null")))
+```
+
+DO CHALLENGE ON OTTER BEHAVIOR
+
+```{r}
+library(tidyverse)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/Bowden-ParryOtterdata.csv"
+d <- read_csv(f, col_names = TRUE)
+```
