@@ -2034,3 +2034,61 @@ library(tidyverse)
 f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/Bowden-ParryOtterdata.csv"
 d <- read_csv(f, col_names = TRUE)
 ```
+
+## 4/22/2025, Mixed Effects Models Cont and Making Packages
+
+Generalized, response is not continuous variable
+
+Create new random vairable, "trial" that joins zoo and trials order
+
+```{r}
+library(tidyverse)
+library(lme4)
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/refs/heads/main/Bowden-ParryOtterdata.csv"
+d <- read_csv(f, col_names = TRUE)
+
+d <- d |>
+  mutate(trial = paste0(zoo, trialorder)) |>
+  rename(Shared = TotalSharebothharasspro, BegRec = begreceived) |>
+  rowid_to_column(var = "rowid")
+
+ggplot(data = d, mapping = aes(x = BegRec, y = Shared, color = ID)) +
+  geom_point() +
+  geom_jitter()
+
+#mirroring study, begrec and offset for trial duration as fixed effects, observation-level and otterID and trial ID as random effect
+#M1 the amount of begging received influence sharing frequency
+#response variable is  rate, event count per time. Time must then be a predictor variable, useing offset() function to indicate this in the regression formula
+#Shared ~ BegRec + offset(log(trialduration/60))
+m1 <- glmer(data = d, Shared ~ BegRec + offset(log(trialduration/60)) + (1|ID) + (1|trial) + (1|rowid), family = poisson(link = log))
+summary(m1)
+(x <- broom.mixed::tidy(m1)) #Based on model, sharing is predicted by begging, low p-val, coefficient different from 0
+
+```
+
+### Building Custom Packages (misc module on course site)
+
+Need {devtools} and {roxygen2} and {withr}
+
+```{r}
+library(tidyverse)
+library(usethis)
+library(devtools)
+library(roxygen2)
+library(withr)
+
+#Making package for singel custom function from Module 17
+
+#Method 1, easy way with create_packages() from {usethis}
+usethis::create_package("C:\\Users\\Jawor\\Desktop\\Rpackage") #Opens new folder/project for creating  package working in this directory now. 
+
+#Method 2: harder but more customizable
+```
+
+Build functions in separate R script files which have header information, save in R file in repo.
+
+Making own function, need to know that nothing outside of the function will be rendered, need to make sure all code for hte function is WITHIN the function. Also need to make sure that library(), require(), or source() are not being called within the function, instead make sure the function has something like ggplot2:: in it when it calls ggplot for example.
+
+Function documentation, comments and tags look like \#' @
+
+Adding in dependencies with use_package() function from {usethis}, add to console which will update description file
